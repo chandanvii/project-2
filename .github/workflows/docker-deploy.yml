@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '*/1 * * * *'  # Har 1 minute pe check karega (changed from */15)
 
 env:
   DOCKER_USERNAME: chandanviii
@@ -24,6 +26,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       -
         name: Git Status Check
@@ -31,15 +35,6 @@ jobs:
           echo "🔍 Checking Git Status..."
           git status
           
-      -
-        name: Initialize Git (if needed)
-        run: |
-          if [ ! -d ".git" ]; then
-            echo "📦 Initializing Git..."
-            git init
-            git remote add origin https://github.com/chandanvii/project-2.git
-          fi
-
       # Docker Operations
       -
         name: Set up Docker Buildx
@@ -58,7 +53,18 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.DOCKER_IMAGE }}:latest
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+      
+      # Automated Deployment
+      -
+        name: Deploy Container
+        run: |
+          echo "🚀 Deploying new container..."
+          docker stop finexo-container || true
+          docker rm finexo-container || true
+          docker run -d -p 8083:80 --name finexo-container ${{ env.DOCKER_IMAGE }}:latest
       
       # Final Git Operations
       -
@@ -73,7 +79,7 @@ jobs:
           if [[ -n $(git status -s) ]]; then
             echo "📝 Changes detected, committing..."
             git add .
-            git commit -m "Automated commit from GitHub Actions"
+            git commit -m "Automated update from GitHub Actions at $(date '+%Y-%m-%d %H:%M:%S')"
             git push origin main
           else
             echo "✨ No changes to commit"
@@ -87,3 +93,4 @@ jobs:
           echo "✅ Git operations completed"
           echo "🐳 Docker image built and pushed"
           echo "🚀 Deployment successful"
+          echo "🌐 Website is live at: http://localhost:8083"
